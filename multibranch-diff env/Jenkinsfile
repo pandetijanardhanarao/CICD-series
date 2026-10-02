@@ -1,0 +1,72 @@
+pipeline {
+    agent any
+
+    environment {
+        GIT_URL = 'https://github.com/your-org/terraform-project.git'
+        GIT_CREDENTIALS = 'github-creds'
+    }
+
+    stages {
+
+        //================ DEV =================
+        stage('Deploy DEV') {
+            steps {
+                echo "Checking out DEV branch..."
+
+                git branch: 'dev',
+                    credentialsId: "${GIT_CREDENTIALS}",
+                    url: "${GIT_URL}"
+
+                sh '''
+                terraform init
+                terraform workspace select dev || terraform workspace new dev
+                terraform plan -var-file=environments/dev.tfvars
+                terraform apply -auto-approve -var-file=environments/dev.tfvars
+                '''
+            }
+        }
+
+        //================ TEST =================
+        stage('Deploy TEST') {
+            steps {
+                echo "Checking out TEST branch..."
+
+                git branch: 'test',
+                    credentialsId: "${GIT_CREDENTIALS}",
+                    url: "${GIT_URL}"
+
+                sh '''
+                terraform init
+                terraform workspace select test || terraform workspace new test
+                terraform plan -var-file=environments/test.tfvars
+                terraform apply -auto-approve -var-file=environments/test.tfvars
+                '''
+            }
+        }
+
+        //================ PROD APPROVAL =================
+        stage('Production Approval') {
+            steps {
+                input "Deploy to Production?"
+            }
+        }
+
+        //================ PROD =================
+        stage('Deploy PROD') {
+            steps {
+                echo "Checking out PROD branch..."
+
+                git branch: 'prod',
+                    credentialsId: "${GIT_CREDENTIALS}",
+                    url: "${GIT_URL}"
+
+                sh '''
+                terraform init
+                terraform workspace select prod || terraform workspace new prod
+                terraform plan -var-file=environments/prod.tfvars
+                terraform apply -auto-approve -var-file=environments/prod.tfvars
+                '''
+            }
+        }
+    }
+}
